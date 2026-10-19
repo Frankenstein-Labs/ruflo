@@ -95,6 +95,9 @@ function validateTask(task: OpenHandsTask, allowedWorkspaceRoot: string): void {
   if (!task.workingDirectory.startsWith('/')) {
     throw new OpenHandsBackendError('workingDirectory must be an absolute POSIX path visible to Agent Server.');
   }
+  if (task.workingDirectory.split('/').includes('..')) {
+    throw new OpenHandsBackendError('workingDirectory must not contain path traversal segments.');
+  }
   if (!allowedWorkspaceRoot.startsWith('/') || allowedWorkspaceRoot.split('/').includes('..')) {
     throw new OpenHandsBackendError('allowedWorkspaceRoot must be an absolute POSIX path without traversal segments.');
   }
@@ -137,7 +140,8 @@ export class OpenHandsAgentBackend {
     if (!config.agent || typeof config.agent !== 'object' || Array.isArray(config.agent)) {
       throw new OpenHandsBackendError('A valid OpenHands agent specification is required.');
     }
-    if (!config.allowedWorkspaceRoot || !config.allowedWorkspaceRoot.startsWith('/')) {
+    if (!config.allowedWorkspaceRoot || !config.allowedWorkspaceRoot.startsWith('/') ||
+      config.allowedWorkspaceRoot.split('/').includes('..')) {
       throw new OpenHandsBackendError('allowedWorkspaceRoot must be configured as an absolute POSIX path.');
     }
     if (config.maxIterations !== undefined &&

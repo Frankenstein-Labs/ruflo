@@ -705,3 +705,89 @@ enabled = true
 - Issues: https://github.com/ruvnet/claude-flow/issues
 
 **Remember: Codex executes, claude-flow orchestrates!**
+
+---
+
+## CORTEX Agent OS (v3)
+
+The CORTEX runtime lives in `v3/src/cortex/` with tests in `v3/__tests__/cortex/`.
+`docs/CORTEX_SDK_REGISTRY.md` records the verified version and real API shape of
+each of the ten SDKs; read it before touching an adapter.
+
+### Commands
+
+```bash
+cd v3
+npx vitest run --coverage.enabled=false __tests__/cortex/
+npx vitest run --coverage.enabled=false \
+  __tests__/integration/openhands-backend.test.ts \
+  __tests__/integration/openhands-swarm.test.ts \
+  __tests__/integration/openhands-git-worktree.test.ts
+npx tsc --noEmit --strict --target es2022 --module esnext \
+  --moduleResolution bundler --skipLibCheck --esModuleInterop src/cortex/index.ts
+```
+
+`v3/tsconfig.json` has `"include": []`, so a bare `tsc -p tsconfig.json` typechecks
+nothing. Pass the entry file explicitly, as the CI job does.
+
+### Adapters must be written against the installed package
+
+Every adapter bug found so far came from an assumed API rather than a probed one.
+Do not write an adapter from memory; inspect the installed package first, and
+keep tests pointed at real code rather than a hand-written mock.
+
+Confirmed API traps:
+
+- **Vitest 4.1.8** — `TestModule.children` is a `TestCollection` object, not a
+  callable and not an array. Count tests with `children.allTests()`, which also
+  walks nested suites. Vitest always adds a console reporter unless one is
+  supplied, so pass a no-op reporter or the nested run's output leaks into the
+  parent console.
+- **CycloneDX 10.3.0** — `Models.Component` takes positional
+  `(type, name, version)`. A single options object produces a nameless component.
+  `version` must be assigned after construction, `licenses` is a repository
+  (`component.licenses.add(...)`), and `JsonSerializer.serialize()` returns a
+  JSON **string**, not an object.
+- **Autocannon 8.0.0** — `autocannon()` already returns one aggregated result.
+  The separately exported `aggregateResult()` merges an *array* of runs and
+  throws if given the single result object.
+
+### OpenHands boundary
+
+CORTEX talks to the Agent Server over HTTP; it does not import the Python
+`openhands-sdk` into the Node process. The base URL must be HTTPS unless it is
+loopback. `isAvailable()` stays `false` until the integration is explicitly
+enabled and configured, so an unconfigured OpenHands is never reported as
+available.
+
+`CortexWorkspaceManager` owns both paths for a task: `hostPath` (where Git
+writes) and `sandboxPath` (where the Agent Server sees it). Never derive one
+from the other; only the deployment's mount configuration knows the mapping.
+
+A swarm task counts as verified only when the independently injected
+`OpenHandsResultVerifier` actually ran and passed. A finished conversation is not
+proof that code is correct.
+
+### Pushing to this repository
+
+`GITHUB_TOKEN` is read-only here and a `git push` with it fails with
+`403 ... denied`. `GITHUB_PERSONAL_ACCESS_TOKEN` has admin rights; use it for the
+remote:
+
+```bash
+git remote set-url origin \
+  "https://x-access-token:${GITHUB_PERSONAL_ACCESS_TOKEN}@github.com/Frankenstein-Labs/ruflo.git"
+```
+
+Do not commit or echo the token value; the credential is injected at run time.
+
+### Honesty rules
+
+The registry and the docs enforce these, and reviewers will check them:
+
+- A status above `identified` must name a concrete pinned version.
+- A descriptor's `source` must be an `https://` URL.
+- One SDK per capability; a second registration is an error, not an override.
+- Report capability counts, never a single completion percentage.
+- Say what has not been tested. Live Agent Server execution, a production
+  verifier, merge coordination, and the Cloud IDE front end are all still open.

@@ -7,6 +7,7 @@ services:
       # Bind to loopback only; put an authenticated HTTPS gateway in front for remote access.
       - "127.0.0.1:8000:8000"
     environment:
+      SESSION_API_KEY: ${CORTEX_OPENHANDS_API_KEY:?Set CORTEX_OPENHANDS_API_KEY in your local environment}
       LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY in your local environment}
       LLM_MODEL: ${LLM_MODEL:?Set LLM_MODEL in your local environment}
       LOG_LEVEL: ${OPENHANDS_LOG_LEVEL:-INFO}

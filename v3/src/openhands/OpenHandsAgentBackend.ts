@@ -245,9 +245,13 @@ export class OpenHandsAgentBackend {
         throw new OpenHandsBackendError(`Timed out waiting for OpenHands conversation ${conversationId}.`);
       }
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', abort);
+          resolve();
+        }, Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
         const abort = () => {
           clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
           reject(new OpenHandsBackendError('OpenHands task wait was cancelled.'));
         };
         signal?.addEventListener('abort', abort, { once: true });
@@ -302,7 +306,7 @@ export class OpenHandsAgentBackend {
 }
 
 export function openHandsConfigFromEnv(
-  agent: Record<string, unknown>,
+  agent: OpenHandsBackendConfig['agent'],
   env: Record<string, string | undefined> = process.env,
 ): OpenHandsBackendConfig {
   const timeout = Number(env.CORTEX_OPENHANDS_REQUEST_TIMEOUT_MS ?? 60_000);

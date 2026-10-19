@@ -117,6 +117,6 @@ export class OpenHandsGitWorktreeProvisioner implements OpenHandsWorkspaceProvis
     }
 
     const serverPath = path.posix.join(this.serverWorkspaceRoot, ...relativePath.split(path.sep));
-    return { branchName, workingDirectory: serverPath };
+    return { branchName, workingDirectory: serverPath, hostWorkingDirectory: requestedPath };
   }
 }

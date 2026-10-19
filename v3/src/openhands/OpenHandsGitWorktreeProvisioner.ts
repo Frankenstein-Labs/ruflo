@@ -55,6 +55,9 @@ export class OpenHandsGitWorktreeProvisioner implements OpenHandsWorkspaceProvis
     this.hostWorkspaceRoot = absoluteWithoutTraversal(options.hostWorkspaceRoot, 'hostWorkspaceRoot');
     this.serverWorkspaceRoot = absoluteWithoutTraversal(options.serverWorkspaceRoot, 'serverWorkspaceRoot');
     this.baseRef = options.baseRef ?? 'HEAD';
+    if (!this.baseRef.trim() || this.baseRef.startsWith('-') || /[\\r\\n]/.test(this.baseRef)) {
+      throw new Error('baseRef must be a non-empty Git ref and must not start with a dash.');
+    }
     this.runGit = options.runGit ?? (async (args) => {
       const result = await execFile('git', args, { cwd: this.repositoryRoot, timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
       return { stdout: result.stdout, stderr: result.stderr };
@@ -70,6 +73,9 @@ export class OpenHandsGitWorktreeProvisioner implements OpenHandsWorkspaceProvis
     if (!branchName || branchName.length > 180 || branchName.startsWith('-') ||
       branchName.split('/').some((part) => !part || part === '.' || part === '..' || !/^[a-zA-Z0-9._-]+$/.test(part))) {
       throw new Error('branchName contains unsupported Git ref characters.');
+    }
+    if (!path.isAbsolute(task.workingDirectory)) {
+      throw new Error('workingDirectory must be an absolute host path.');
     }
     const requestedPath = path.resolve(task.workingDirectory);
     const relativePath = path.relative(this.hostWorkspaceRoot, requestedPath);

@@ -51,7 +51,7 @@ export class OpenHandsGitResultVerifier implements OpenHandsResultVerifier {
     const checks: OpenHandsTaskVerification['checks'] = [];
     const run = async (name: string, command: string, args: string[]) => {
       try {
-        await this.runCommand(command, args, input.task.workingDirectory, this.timeoutMs);
+        await this.runCommand(command, args, input.workspace.hostWorkingDirectory ?? input.task.workingDirectory, this.timeoutMs);
         checks.push({ name, passed: true });
       } catch (error) {
         // Do not echo stdout/stderr because commands may print environment secrets.

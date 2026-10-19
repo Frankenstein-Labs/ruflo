@@ -1,0 +1,21 @@
+services:
+  agent-server:
+    # Keep this version aligned with the SDK submodule pin documented in README.md.
+    image: ghcr.io/openhands/agent-server:1.56.0-python
+    restart: unless-stopped
+    ports:
+      # Bind to loopback only; put an authenticated HTTPS gateway in front for remote access.
+      - "127.0.0.1:8000:8000"
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY in your local environment}
+      LLM_MODEL: ${LLM_MODEL:?Set LLM_MODEL in your local environment}
+      LOG_LEVEL: ${OPENHANDS_LOG_LEVEL:-INFO}
+    volumes:
+      # Agent Server sees the same workspace path used by the CORTEX adapter.
+      - ${CORTEX_OPENHANDS_WORKSPACES:-../../.cortex-workspaces}:/workspace
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s

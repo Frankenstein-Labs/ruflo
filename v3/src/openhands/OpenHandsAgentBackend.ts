@@ -50,6 +50,10 @@ export class OpenHandsBackendError extends Error {
   }
 }
 
+function isLocalHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+}
+
 function safeBaseUrl(value: string): URL {
   let url: URL;
   try {
@@ -58,7 +62,7 @@ function safeBaseUrl(value: string): URL {
     throw new OpenHandsBackendError('CORTEX_OPENHANDS_BASE_URL must be a valid URL.');
   }
 
-  const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
+  const local = isLocalHost(url.hostname);
   if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) {
     throw new OpenHandsBackendError('OpenHands Agent Server must use HTTPS (HTTP is allowed only for localhost).');
   }
@@ -104,7 +108,7 @@ export class OpenHandsAgentBackend {
     if (!config.agent || typeof config.agent !== 'object' || Array.isArray(config.agent)) {
       throw new OpenHandsBackendError('A valid OpenHands agent specification is required.');
     }
-    if (!this.baseUrl.hostname.includes('localhost') && !this.baseUrl.hostname.includes('127.0.0.1') && !config.apiKey) {
+    if (!isLocalHost(this.baseUrl.hostname) && !config.apiKey) {
       throw new OpenHandsBackendError('CORTEX_OPENHANDS_API_KEY is required for non-local Agent Server URLs.');
     }
     this.fetchImpl = config.fetchImpl ?? fetch;

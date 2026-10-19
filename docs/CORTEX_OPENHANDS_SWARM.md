@@ -41,9 +41,28 @@ Implement OpenHandsWorkspaceProvisioner.prepare() using the deployment's Git and
 
 Implement OpenHandsResultVerifier.verify() to collect the actual diff, check allowed paths, use the project's pinned toolchain, run relevant tests and static checks, and evaluate each acceptance criterion. It must return a failed result if evidence is missing or any required check fails.
 
-### 3. Merge coordinator (next phase)
+### 3. Merge coordinator
 
-After tasks are independently verified, a coordinator must check dependency order, rebase or cherry-pick into an integration branch, detect conflicts, rerun the full test suite, and request human approval before merging into a protected branch. Do not automatically merge unverified agent output.
+Implemented as `CortexMergeCoordinator` (`v3/src/cortex/runtime/merge.ts`).
+After the swarm verifies tasks, the bridge commits each verified worktree onto
+its branch (`CortexWorkspaceManager.commit`) before releasing it, then the
+coordinator integrates the verified branches into one integration branch.
+
+It enforces two invariants:
+
+- a branch is never merged unless its candidate is marked `verified`, so agent
+  output that no verifier passed can never reach the integration branch;
+- on conflict the merge is aborted and the integration branch is left on the
+  last good merge, never a half-applied tree.
+
+It also orders dependencies first (a cycle or an unknown dependency is a hard
+error, not a guess), recreates the integration branch from the base ref on each
+run so repeated runs do not stack, and rejects unsafe branch names before
+touching Git. Tests: `v3/__tests__/cortex/cortex-merge.test.ts` (8 tests on a
+real repository).
+
+It does not request human approval and does not push: a reviewer still decides
+whether the integration branch is merged into a protected branch.
 
 ### 4. Operational controls
 
@@ -70,6 +89,12 @@ What was actually run:
 - Each task ran in its own Git worktree on its own branch
   (`cortex/alpha`, `cortex/beta`, `cortex/gamma`). Each agent wrote its marker
   file only in its own worktree; no marker appeared in another task's worktree.
+- Three distinct roles ran at once (testing, documentation, security), not three
+  copies of one role.
+- The bridge committed each verified worktree onto its branch before releasing
+  it, and `CortexMergeCoordinator` merged the three verified branches into
+  `cortex/integration`. The integration tree contained `alpha.txt`, `beta.txt`
+  and `gamma.txt`, with one merge commit per branch.
 
 The runnable proof is `v3/__tests__/integration/cortex-live-swarm.test.ts`. It is
 skipped unless `CORTEX_LIVE_AGENT_SERVER_URL` is set, so it never runs in CI
@@ -110,13 +135,15 @@ them contradicted earlier assumptions in this repository:
 
 ### What is still not done
 
-This is a working multi-agent execution path, not a finished service. Still open:
+This is a working multi-agent execution path plus a merge coordinator, not a
+finished service. Still open:
 
-- the merge coordinator that integrates verified branches (section 3 above);
-- production secret management for the LLM key (the key is passed per request in
-  this local setup);
-- the run above used three tasks of one role; the ten roles exist as
-  configuration, and only the `testing` role has been exercised live.
+- the live run exercised three roles (testing, documentation, security). The
+  other seven roles exist as configuration and have not been run live;
+- the integration branch is never pushed and no human approval gate is wired
+  in; a reviewer still has to decide whether to merge it;
+- production secret management for the LLM key (the key is passed per request
+  in this local setup).
 
 ## References
 

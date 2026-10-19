@@ -53,6 +53,8 @@ export interface CortexSwarmOutcome {
   readonly branchName: string;
   readonly status: OpenHandsSwarmTaskResult['status'];
   readonly verified: boolean;
+  /** Commit sha on the task branch, set when verified work was persisted. */
+  readonly commitSha?: string;
   readonly error?: string;
 }
 
@@ -130,15 +132,30 @@ export class CortexSwarmBridge {
         if (!request) {
           throw new CortexValidationError(`the swarm reported an unknown task ${result.taskId}.`);
         }
+        // Only a swarm result that ran its verifier counts as verified.
+        const verified = result.status === 'verified' && result.verification?.passed === true;
+        // Persist verified work onto its branch before the worktree is removed;
+        // otherwise the release below destroys changes the merge coordinator
+        // would need.
+        let commitSha: string | undefined;
+        let commitError: string | undefined;
+        if (verified) {
+          try {
+            const commit = await this.workspaces.commit(result.taskId);
+            commitSha = commit.commitSha;
+          } catch (error) {
+            commitError = safeErrorMessage(error, 200);
+          }
+        }
         outcomes.push({
           taskId: result.taskId,
           capability: request.capability,
           role: result.role,
           branchName: result.branchName,
           status: result.status,
-          // Only a swarm result that ran its verifier counts as verified.
-          verified: result.status === 'verified' && result.verification?.passed === true,
-          error: result.error,
+          verified: verified && commitError === undefined,
+          commitSha,
+          error: result.error ?? commitError,
         });
       }
       return outcomes;

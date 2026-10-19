@@ -212,6 +212,42 @@ export class CortexWorkspaceManager {
     return conflicts;
   }
 
+  /**
+   * Commit everything the agent left in the worktree onto its branch.
+   *
+   * Callers must have verified the result first: the swarm releases the
+   * worktree in its finally block, so an uncommitted change is destroyed before
+   * a merge coordinator could ever see it. Returns the commit sha, or undefined
+   * when the worktree had no changes (nothing to commit is not an error).
+   */
+  async commit(
+    taskId: string,
+    options: { message?: string } = {},
+  ): Promise<{ committed: boolean; commitSha?: string }> {
+    const record = this.records.get(taskId);
+    if (!record) throw new CortexValidationError(`No workspace is recorded for task ${taskId}.`);
+    if (record.status !== 'created' && record.status !== 'reused') {
+      throw new CortexValidationError(`Workspace for task ${taskId} is not active.`);
+    }
+    const changes = await this.changedFiles(record);
+    if (changes.length === 0) return { committed: false };
+
+    const add = await this.runGit(['add', '--all'], record.hostPath);
+    if (add.exitCode !== 0) {
+      throw new CortexValidationError(`git add failed for task ${taskId}: ${safeErrorMessage(add.stderr, 200)}`);
+    }
+    const message = (options.message ?? `cortex(${taskId}): agent changes`).slice(0, 200);
+    const commit = await this.runGit(
+      ['-c', 'user.name=CORTEX', '-c', 'user.email=cortex@local', 'commit', '-q', '-m', message],
+      record.hostPath,
+    );
+    if (commit.exitCode !== 0) {
+      throw new CortexValidationError(`git commit failed for task ${taskId}: ${safeErrorMessage(commit.stderr, 200)}`);
+    }
+    const head = await this.runGit(['rev-parse', 'HEAD'], record.hostPath);
+    return { committed: true, commitSha: head.stdout.trim() };
+  }
+
   /** Remove the worktree and branch. Callers must have verified the result. */
   async release(taskId: string, options: { deleteBranch?: boolean } = {}): Promise<CortexWorkspaceRecord> {
     const record = this.records.get(taskId);

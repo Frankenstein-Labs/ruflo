@@ -126,3 +126,11 @@ export {
   type CortexSwarmOutcome,
   type CortexSwarmTaskRequest,
 } from './runtime/swarm';
+export {
+  CortexMergeCoordinator,
+  type CortexMergeCandidate,
+  type CortexMergeCoordinatorOptions,
+  type CortexMergeReport,
+  type CortexMergeResult,
+  type CortexMergeStatus,
+} from './runtime/merge';

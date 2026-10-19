@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 import { OpenHandsAgentBackend } from '../../src/openhands/OpenHandsAgentBackend';
 import { OpenHandsSwarm } from '../../src/openhands/OpenHandsSwarm';
 import { CortexWorkspaceManager } from '../../src/cortex/runtime/workspace';
+import { CortexMergeCoordinator } from '../../src/cortex/runtime/merge';
 import {
   CortexSwarmBridge,
   CortexWorkspaceProvisionerBridge,
@@ -112,9 +113,16 @@ describe.skipIf(!LIVE_URL)('CORTEX live swarm against a real Agent Server', () =
     });
 
     const bridge = new CortexSwarmBridge(swarm, workspaces);
-    const requests = ['alpha', 'beta', 'gamma'].map((name) => ({
+    // Distinct capabilities map to distinct specialist roles, so this exercises
+    // three different roles running at once rather than three copies of one.
+    const plan: Array<{ name: string; capability: 'testing' | 'documentation' | 'security' }> = [
+      { name: 'alpha', capability: 'testing' },
+      { name: 'beta', capability: 'documentation' },
+      { name: 'gamma', capability: 'security' },
+    ];
+    const requests = plan.map(({ name, capability }) => ({
       taskId: name,
-      capability: 'testing' as const,
+      capability,
       instruction:
         `Create a file named ${name}.txt in your working directory containing exactly ` +
         `the single word ${name}. Do not create any other file.`,
@@ -132,10 +140,36 @@ describe.skipIf(!LIVE_URL)('CORTEX live swarm against a real Agent Server', () =
       expect(outcome.status, `${outcome.taskId}: ${outcome.error ?? ''}`).toBe('verified');
       expect(outcome.verified).toBe(true);
     }
+    // Three distinct roles really ran.
+    expect(new Set(outcomes.map((o) => o.role))).toEqual(new Set(['testing', 'documentation', 'security']));
+    // Verified work was committed onto each task branch before the worktree was
+    // removed, so the branch is not still sitting on the base commit.
+    const baseSha = (await git(['rev-parse', 'main'], repo)).trim();
+    for (const outcome of outcomes) {
+      expect(outcome.commitSha, `${outcome.taskId} commit`).toBeTruthy();
+      expect(outcome.commitSha).not.toBe(baseSha);
+    }
 
     // Isolation: no task's marker file appeared in another task's workspace.
     expect(contamination, contamination.join('; ')).toEqual([]);
     // Each task really did get its own worktree path.
     expect(new Set(hostByTask.values()).size).toBe(3);
+
+    // Finally, integrate only the verified branches and check the result.
+    const coordinator = new CortexMergeCoordinator({ repositoryRoot: repo, baseRef: 'main' });
+    const report = await coordinator.integrate(
+      outcomes.map((outcome) => ({
+        taskId: outcome.taskId,
+        branchName: outcome.branchName,
+        verified: outcome.verified,
+      })),
+    );
+
+    expect(report.complete, JSON.stringify(report.results)).toBe(true);
+    expect(report.results.every((r) => r.status === 'merged')).toBe(true);
+
+    // The integration branch contains all three agent files.
+    const tracked = await git(['ls-tree', '-r', '--name-only', report.integrationBranch], repo);
+    for (const { name } of plan) expect(tracked).toContain(`${name}.txt`);
   }, 900_000);
 });

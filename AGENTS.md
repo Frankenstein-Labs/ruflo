@@ -768,6 +768,12 @@ A swarm task counts as verified only when the independently injected
 `OpenHandsResultVerifier` actually ran and passed. A finished conversation is not
 proof that code is correct.
 
+The swarm bridge releases every worktree in a `finally` block, so an agent's
+changes are destroyed unless they are committed first. `CortexSwarmBridge` now
+commits each verified worktree onto its branch (`CortexWorkspaceManager.commit`)
+before releasing it; without that, a task branch stays on the base commit and a
+merge coordinator would merge nothing.
+
 ### Pushing to this repository
 
 `GITHUB_TOKEN` is read-only here and a `git push` with it fails with
@@ -838,7 +844,7 @@ The registry and the docs enforce these, and reviewers will check them:
 - A descriptor's `source` must be an `https://` URL.
 - One SDK per capability; a second registration is an error, not an override.
 - Report capability counts, never a single completion percentage.
-- Say what has not been tested. Live multi-agent isolation is now proven (three
-  concurrent tasks, three branches, no cross-contamination). Still open: the merge
-  coordinator, production secret management, and live runs of the other nine
-  roles.
+- Say what has not been tested. Live multi-agent isolation and merge are now
+  proven (three distinct roles, three branches, no cross-contamination, merged
+  into one integration branch). Still open: live runs of the other seven roles,
+  a human approval gate, and production secret management.

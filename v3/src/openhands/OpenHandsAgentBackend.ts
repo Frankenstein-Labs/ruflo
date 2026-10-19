@@ -11,7 +11,7 @@ export interface OpenHandsBackendConfig {
   timeoutMs?: number;
   enabled?: boolean;
   /** Agent specification accepted by the configured OpenHands Agent Server. */
-  agent: Record<string, unknown>;
+  agent: { kind: string; llm: { model: string; [key: string]: unknown }; [key: string]: unknown };
   /** Absolute workspace root visible to Agent Server; tasks cannot escape it. */
   allowedWorkspaceRoot: string;
   maxIterations?: number;
@@ -137,8 +137,10 @@ export class OpenHandsAgentBackend {
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 1_000 || this.timeoutMs > 15 * 60_000) {
       throw new OpenHandsBackendError('timeoutMs must be between 1000 and 900000.');
     }
-    if (!config.agent || typeof config.agent !== 'object' || Array.isArray(config.agent)) {
-      throw new OpenHandsBackendError('A valid OpenHands agent specification is required.');
+    if (!config.agent || typeof config.agent !== 'object' || Array.isArray(config.agent) ||
+      typeof config.agent.kind !== 'string' || !config.agent.kind.trim() ||
+      !config.agent.llm || typeof config.agent.llm.model !== 'string' || !config.agent.llm.model.trim()) {
+      throw new OpenHandsBackendError('Agent specification must include kind and llm.model.');
     }
     if (!config.allowedWorkspaceRoot || !config.allowedWorkspaceRoot.startsWith('/') ||
       config.allowedWorkspaceRoot.split('/').includes('..')) {
@@ -212,6 +214,45 @@ export class OpenHandsAgentBackend {
       { method: 'GET' },
       signal,
     );
+  }
+
+  /**
+   * Polls until the Agent Server reports a terminal state or the caller's
+   * deadline/cancellation fires. This reports execution state only; it does
+   * not verify diffs, run tests, or prove acceptance criteria.
+   */
+  async waitForCompletion(
+    conversationId: string,
+    options: { pollIntervalMs?: number; maxWaitMs?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<OpenHandsConversation> {
+    const pollIntervalMs = options.pollIntervalMs ?? 2_000;
+    const maxWaitMs = options.maxWaitMs ?? 10 * 60_000;
+    if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 250 || pollIntervalMs > 30_000) {
+      throw new OpenHandsBackendError('pollIntervalMs must be an integer between 250 and 30000.');
+    }
+    if (!Number.isInteger(maxWaitMs) || maxWaitMs < pollIntervalMs || maxWaitMs > 60 * 60_000) {
+      throw new OpenHandsBackendError('maxWaitMs must be between pollIntervalMs and 3600000.');
+    }
+
+    const deadline = Date.now() + maxWaitMs;
+    while (true) {
+      if (signal?.aborted) throw new OpenHandsBackendError('OpenHands task wait was cancelled.');
+      const conversation = await this.getConversation(conversationId, signal);
+      const state = String(conversation.execution_status ?? conversation.status ?? '').toLowerCase();
+      if (['finished', 'error', 'stuck', 'deleting'].includes(state)) return conversation;
+      if (Date.now() >= deadline) {
+        throw new OpenHandsBackendError(`Timed out waiting for OpenHands conversation ${conversationId}.`);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())));
+        const abort = () => {
+          clearTimeout(timer);
+          reject(new OpenHandsBackendError('OpenHands task wait was cancelled.'));
+        };
+        signal?.addEventListener('abort', abort, { once: true });
+      });
+    }
   }
 
   private async request<T>(

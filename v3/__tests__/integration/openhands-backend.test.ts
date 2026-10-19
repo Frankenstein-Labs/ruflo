@@ -90,6 +90,21 @@ describe('OpenHandsAgentBackend', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('rejects workspaces outside the configured root', async () => {
+    const fetchImpl = vi.fn();
+    const backend = new OpenHandsAgentBackend({
+      baseUrl: 'http://localhost:8000',
+      enabled: true,
+      agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await expect(backend.submit({ ...task, workingDirectory: '/workspace-evil/project' }))
+      .rejects.toThrow(/outside the configured allowedWorkspaceRoot/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('redacts response bodies from HTTP errors', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response('SECRET_PROVIDER_DETAIL', { status: 500 }),

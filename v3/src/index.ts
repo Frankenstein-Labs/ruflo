@@ -56,3 +56,7 @@ export {
   type OpenHandsTaskVerification,
   type OpenHandsResultVerifier,
 } from './openhands/OpenHandsSwarm';
+
+// CORTEX OpenHands Git worktrees and acceptance verification
+export { OpenHandsGitWorktreeProvisioner, type GitWorktreeProvisionerOptions } from './openhands/OpenHandsGitWorktreeProvisioner';
+export { OpenHandsGitResultVerifier, type GitResultVerifierOptions } from './openhands/OpenHandsGitResultVerifier';

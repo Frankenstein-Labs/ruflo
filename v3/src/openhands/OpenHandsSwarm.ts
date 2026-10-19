@@ -23,7 +23,10 @@ export interface OpenHandsSwarmTask {
 
 export interface OpenHandsWorkspace {
   branchName: string;
+  /** Absolute path visible inside Agent Server; passed to the OpenHands SDK. */
   workingDirectory: string;
+  /** Host path used for Git operations and local verification. */
+  hostWorkingDirectory?: string;
 }
 
 export interface OpenHandsWorkspaceProvisioner {
@@ -153,7 +156,7 @@ export class OpenHandsSwarm {
     try {
       workspace = await this.workspaces.prepare(task);
       if (workspace.branchName !== task.branchName ||
-          workspace.workingDirectory !== task.workingDirectory) {
+          (!workspace.hostWorkingDirectory && workspace.workingDirectory !== task.workingDirectory)) {
         throw new Error('Provisioner returned a workspace that does not match the requested branch and directory.');
       }
     } catch (error) {

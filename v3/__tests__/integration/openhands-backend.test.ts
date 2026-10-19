@@ -24,7 +24,7 @@ describe('OpenHandsAgentBackend', () => {
     expect(() => new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
       enabled: false,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
     })).toThrow(/disabled/i);
   });
@@ -33,14 +33,14 @@ describe('OpenHandsAgentBackend', () => {
     expect(() => new OpenHandsAgentBackend({
       baseUrl: 'http://agent.example.com',
       enabled: true,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
     })).toThrow(/HTTPS/i);
 
     expect(() => new OpenHandsAgentBackend({
       baseUrl: 'https://agent.example.com',
       enabled: true,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
     })).toThrow(/API_KEY/i);
   });
@@ -53,7 +53,7 @@ describe('OpenHandsAgentBackend', () => {
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
       enabled: true,
-      agent: { llm: { model: 'test-model' } },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -80,7 +80,7 @@ describe('OpenHandsAgentBackend', () => {
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
       enabled: true,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -95,7 +95,7 @@ describe('OpenHandsAgentBackend', () => {
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
       enabled: true,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -112,7 +112,7 @@ describe('OpenHandsAgentBackend', () => {
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
       enabled: true,
-      agent: { llm: {} },
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
@@ -128,11 +128,11 @@ describe('OpenHandsAgentBackend', () => {
   });
 
   it('maps environment configuration without enabling the backend implicitly', () => {
-    const config = openHandsConfigFromEnv({ llm: { model: 'test-model' } }, {
+    const config = openHandsConfigFromEnv({ kind: 'CodeActAgent', llm: { model: 'test-model' } }, {
       CORTEX_OPENHANDS_BASE_URL: 'http://localhost:8000',
     });
     expect(config.enabled).toBe(false);
-    expect(config.agent).toEqual({ llm: { model: 'test-model' } });
+    expect(config.agent).toEqual({ kind: 'CodeActAgent', llm: { model: 'test-model' } });
     expect(config.allowedWorkspaceRoot).toBe('');
   });
 });

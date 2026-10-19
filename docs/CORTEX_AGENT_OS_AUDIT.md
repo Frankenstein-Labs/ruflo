@@ -59,3 +59,54 @@ The root `docs/STATUS.md` describes a prior snapshot (`ruflo@3.10.2`, dated 2026
 ## Initial acceptance criteria
 
 The first implementation milestone should demonstrate one bounded coding mission that can: inspect an authorized repository, produce a plan, make a small change on an isolated branch/worktree, run relevant tests in a constrained runtime, inspect its own diff, and return a truthful report including failures. The test suite must cover cancellation, tool errors, retry limits, permissions, and prevention of writes outside the authorized workspace.
+
+## Implementation progress
+
+The CORTEX runtime now exists in `v3/src/cortex/` and is exercised by the tests
+in `v3/__tests__/cortex/`. What is implemented, and what remains, are separated
+below so that no claim outruns its evidence.
+
+### Implemented and tested in this repository
+
+- **Ten SDK adapters behind one contract** (`CortexSdkAdapter`), one per
+  functional slot, with real package versions recorded in
+  `docs/CORTEX_SDK_REGISTRY.md`. Each adapter defers its import until
+  `isAvailable()`/`run()`, so a missing package degrades to an honest
+  `available: false` instead of a crash.
+- **Registry honesty guards:** a status above `identified` must name a concrete
+  pinned version, `source` must be `https://`, and a capability may only have one
+  SDK. See `runtime/registry.ts`.
+- **Orchestrator:** bounded concurrency, per-task deadlines enforced by the
+  orchestrator rather than trusted to the adapter, cooperative cancellation,
+  dependency ordering with cycle detection, and failure isolation so one broken
+  SDK does not fail the batch. See `runtime/orchestrator.ts`.
+- **Security core:** fail-closed permission policy, redaction, numeric clamping,
+  path-containment checks, and safe error messages. See `security.ts`.
+- **Isolated workspaces:** one Git branch plus worktree per task, with unique
+  paths, concurrency limits, and no reuse of another task's directory. See
+  `runtime/workspace.ts`.
+- **OpenHands integration:** the swarm (ten specialist roles), a real Git
+  worktree provisioner, and a bridge that maps CORTEX capabilities onto swarm
+  roles. A task is only reported verified when an independently injected
+  verifier passes. See `runtime/swarm.ts` and `src/openhands/`.
+
+### Verified behaviour
+
+The focused suites pass on the audit branch: `__tests__/cortex/` plus the three
+`__tests__/integration/openhands-*.test.ts` files, 96 tests in total.
+
+### Still an integration gate, not yet claimed
+
+- No live Agent Server has been exercised; the OpenHands HTTP contract is tested
+  against a controlled `fetch` implementation, not a running deployment.
+- The result verifier that checks a real diff against acceptance criteria is
+  injected by the caller; a production verifier is not yet implemented.
+- Merge coordination, server-side model-profile selection, a vulnerability feed,
+  and the Cloud IDE front-end are not implemented. The IDE view model exists
+  (`runtime/ideSnapshot.ts`) but no UI consumes it yet.
+
+The two API-level bugs found while writing the adapter tests — Vitest's
+`children` collection and CycloneDX's positional `Component` constructor plus
+string-returning serializer — are the reason every adapter is exercised against
+its installed package rather than against a hand-written mock.
+

@@ -52,6 +52,7 @@ describe('OpenHandsAgentBackend', () => {
 
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
+      apiKey: 'test-session-key',
       enabled: true,
       agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
@@ -69,9 +70,15 @@ describe('OpenHandsAgentBackend', () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(String(fetchImpl.mock.calls[0][0])).toBe('http://localhost:8000/api/conversations');
+    expect((fetchImpl.mock.calls[0][1]?.headers as Record<string, string>)['X-Session-API-Key']).toBe('test-session-key');
     expect(String(fetchImpl.mock.calls[1][0])).toBe('http://localhost:8000/api/conversations/conversation-123/run');
     const payload = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body));
-    expect(payload.workspace).toEqual({ type: 'local', working_dir: '/workspace/project' });
+    expect(payload.workspace).toEqual({ working_dir: '/workspace/project' });
+    expect(payload.agent_settings).toEqual({
+      agent_kind: 'openhands',
+      agent: 'CodeActAgent',
+      llm: { model: 'test-model' },
+    });
     expect(payload.initial_message.content[0].text).toContain('README.md contains a project summary');
   });
 
@@ -125,6 +132,47 @@ describe('OpenHandsAgentBackend', () => {
     }
     expect(error).toBeInstanceOf(OpenHandsBackendError);
     expect(String(error)).not.toContain('SECRET_PROVIDER_DETAIL');
+  });
+
+  it('treats a 409 from /run as already-running, not as a failed submission', async () => {
+    // Verified against Agent Server 1.56.0: when the initial message does not
+    // set `run: false` the server starts the conversation during create, so the
+    // follow-up POST /run is refused with 409. Reporting that as a failure hid a
+    // task that was actually running.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response({ id: 'conversation-409' }))
+      .mockResolvedValueOnce(response({ detail: 'Conversation already running.' }, 409));
+
+    const backend = new OpenHandsAgentBackend({
+      baseUrl: 'http://localhost:8000',
+      apiKey: 'test-session-key',
+      enabled: true,
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
+      allowedWorkspaceRoot: '/workspace',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const handle = await backend.submit(task);
+
+    expect(handle.conversationId).toBe('conversation-409');
+    expect(handle.status).toBe('submitted');
+  });
+
+  it('still reports a non-409 failure from /run as a submission failure', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response({ id: 'conversation-500' }))
+      .mockResolvedValueOnce(response({ detail: 'boom' }, 500));
+
+    const backend = new OpenHandsAgentBackend({
+      baseUrl: 'http://localhost:8000',
+      apiKey: 'test-session-key',
+      enabled: true,
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
+      allowedWorkspaceRoot: '/workspace',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    await expect(backend.submit(task)).rejects.toThrow(/could not be started/i);
   });
 
   it('returns a terminal conversation state without claiming acceptance success', async () => {

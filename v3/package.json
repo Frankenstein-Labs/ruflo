@@ -87,5 +87,16 @@
       "@opentelemetry/sdk-node": ">=0.220.0",
       "better-sqlite3": "12.9.0"
     }
+  },
+  "optionalDependencies": {
+    "@cyclonedx/cyclonedx-library": "10.3.0",
+    "@langchain/langgraph": "1.5.1",
+    "@octokit/rest": "22.0.1",
+    "autocannon": "8.0.0",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "0.45.4",
+    "fastify": "5.12.7",
+    "typedoc": "0.27.9",
+    "vite": "8.3.4"
   }
 }

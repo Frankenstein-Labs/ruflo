@@ -41,3 +41,22 @@ export {
   type OpenHandsTask,
   type OpenHandsTaskHandle,
 } from './openhands/OpenHandsAgentBackend';
+
+// CORTEX ten-role OpenHands swarm
+export {
+  OPENHANDS_SWARM_ROLES,
+  OpenHandsSwarm,
+  type OpenHandsSwarmRole,
+  type OpenHandsSwarmTask,
+  type OpenHandsSwarmOptions,
+  type OpenHandsSwarmTaskResult,
+  type OpenHandsSwarmTaskStatus,
+  type OpenHandsWorkspace,
+  type OpenHandsWorkspaceProvisioner,
+  type OpenHandsTaskVerification,
+  type OpenHandsResultVerifier,
+} from './openhands/OpenHandsSwarm';
+
+// CORTEX OpenHands Git worktrees and acceptance verification
+export { OpenHandsGitWorktreeProvisioner, type GitWorktreeProvisionerOptions } from './openhands/OpenHandsGitWorktreeProvisioner';
+export { OpenHandsGitResultVerifier, type GitResultVerifierOptions } from './openhands/OpenHandsGitResultVerifier';

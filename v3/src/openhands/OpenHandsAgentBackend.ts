@@ -164,16 +164,21 @@ export class OpenHandsAgentBackend {
         task.acceptanceCriteria.map((item, index) => `${index + 1}. ${item}`).join('\n')
       : '\n\nCORTEX must independently define and run verification before reporting success.';
 
+    const { kind: agentClass, llm, ...agentOptions } = this.config.agent;
     const payload = {
-      agent: this.config.agent,
+      agent_settings: {
+        agent_kind: 'openhands',
+        agent: agentClass,
+        ...agentOptions,
+        llm,
+      },
       initial_message: {
         role: 'user',
         content: [{ type: 'text', text: `CORTEX task ${task.taskId}:\n${task.instruction}${criteria}` }],
       },
       max_iterations: task.maxIterations ?? this.config.maxIterations ?? 50,
       stuck_detection: true,
-      workspace: { type: 'local', working_dir: task.workingDirectory },
-      user_id: 'cortex-agent-os',
+      workspace: { working_dir: task.workingDirectory },
     };
 
     const conversation = await this.request<OpenHandsConversation>('/api/conversations', {
@@ -191,12 +196,21 @@ export class OpenHandsAgentBackend {
         body: '{}',
       }, signal);
     } catch (error) {
-      // Do not delete or blindly retry a created conversation: the server may
-      // have accepted it despite a lost response. Surface the ID for recovery.
-      throw new OpenHandsBackendError(
-        `Conversation ${conversation.id} was created but could not be started: ${error instanceof Error ? error.message : 'unknown error'}`,
-        error instanceof OpenHandsBackendError ? error.statusCode : undefined,
-      );
+      // A 409 here is not a failure. The server auto-starts a conversation when
+      // the initial message does not set `run: false`, so by the time we call
+      // /run the conversation is already executing and the server refuses the
+      // duplicate start. Treating that as fatal reported a running task as
+      // failed. Verified against Agent Server 1.56.0: create returns
+      // execution_status "running" and /run returns 409 in that case.
+      const alreadyRunning = error instanceof OpenHandsBackendError && error.statusCode === 409;
+      if (!alreadyRunning) {
+        // Do not delete or blindly retry a created conversation: the server may
+        // have accepted it despite a lost response. Surface the ID for recovery.
+        throw new OpenHandsBackendError(
+          `Conversation ${conversation.id} was created but could not be started: ${error instanceof Error ? error.message : 'unknown error'}`,
+          error instanceof OpenHandsBackendError ? error.statusCode : undefined,
+        );
+      }
     }
 
     return {
@@ -273,7 +287,7 @@ export class OpenHandsAgentBackend {
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (init.body !== undefined) headers['Content-Type'] = 'application/json';
-      if (this.config.apiKey) headers.Authorization = `Bearer ${this.config.apiKey}`;
+      if (this.config.apiKey) headers['X-Session-API-Key'] = this.config.apiKey;
       const response = await this.fetchImpl(new URL(path, this.baseUrl), {
         ...init,
         headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },

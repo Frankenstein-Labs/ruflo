@@ -41,7 +41,11 @@ import {
 // Use a server-supported agent specification. Prefer a server-managed profile
 // or secret configuration so provider credentials are not embedded in code.
 const agent = {
-  // Replace with the exact agent schema supported by your pinned Agent Server.
+  kind: 'CodeActAgent',
+  llm: {
+    model: 'your-configured-model',
+    // Keep provider credentials in the server's secret/config system where possible.
+  },
 };
 
 const backend = new OpenHandsAgentBackend(openHandsConfigFromEnv(agent));
@@ -63,6 +67,8 @@ console.log(handle.conversationId);
 // Follow-up step: query backend.getConversation(handle.conversationId),
 // collect events/diff using the server's documented APIs, and run the project's
 // independent verification pipeline before reporting completion.
+const execution = await backend.waitForCompletion(handle.conversationId);
+console.log(execution.execution_status);
 ```
 
 ## Verification status

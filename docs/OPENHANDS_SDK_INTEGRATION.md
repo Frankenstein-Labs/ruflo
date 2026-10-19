@@ -1,7 +1,7 @@
 # CORTEX Agent OS — OpenHands SDK Integration Plan
 
 **Target branch:** `cortex-agent-os-audit`  
-**Status:** integration design; implementation and runtime validation are still pending.
+**Status:** first REST adapter and mocked tests are committed; build/test and live runtime validation remain pending.
 
 ## Decision
 
@@ -102,4 +102,4 @@ The integration is ready for a first release only when:
 
 ## Explicit non-claims
 
-This plan does not mean the SDK has been installed, connected, or executed yet. It does not establish that CORTEX currently surpasses Devin. Those claims require implementation, test evidence, and reproducible comparative benchmarks.
+This adapter is a first integration slice against the documented Agent Server REST API; it is not the full SDK integration. It has not been built or executed in this ChatGPT session, and no live Agent Server run has been verified. It does not establish that CORTEX currently surpasses Devin. Those claims require implementation, test evidence, and reproducible comparative benchmarks. See [the runtime runbook](CORTEX_OPENHANDS_RUNBOOK.md).

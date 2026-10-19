@@ -7,9 +7,10 @@
 
 - `OpenHandsAgentBackend` is exported from the V3 public entry point.
 - Submits a bounded task to `POST /api/conversations`, then starts it through `POST /api/conversations/{id}/run`.
-- Supports retrieving conversation metadata through `GET /api/conversations/{id}`.
+- Supports retrieving conversation metadata through `GET /api/conversations/{id}` and polling to a terminal execution state with bounded polling intervals and an overall deadline.
 - Defaults to disabled, requires HTTPS for remote servers, requires an API key for remote servers, rejects non-absolute and traversal-containing workspace paths, applies request timeouts, supports caller cancellation, and does not expose error response bodies.
-- Returns `status: "submitted"`, not `completed`. Task success must not be inferred from submission or a conversation stop state.
+- Requires a specific allowed workspace root (the filesystem root `/` is rejected) and prevents tasks from escaping it.
+- Returns `status: "submitted"`, not `completed`. Execution terminal state is not the same as task success; diff inspection and acceptance checks are still required.
 
 ## Runtime prerequisites
 
@@ -79,7 +80,7 @@ Mocked tests cover disabled-by-default behavior, HTTPS/API-key requirements, tas
 
 - Run V3 typecheck/build and the focused test file in CI.
 - Pin and record the exact Agent Server release/API contract.
-- Add event collection and terminal-state normalization against that pinned release.
+- Add event collection and richer terminal-state normalization against that pinned release.
 - Add an isolated-workspace provisioner; do not let user input choose arbitrary host paths in a public service.
 - Add diff collection, test execution, and acceptance-criteria evaluation.
 - Add an opt-in integration test with a disposable Agent Server and a non-production model key.

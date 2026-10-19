@@ -781,6 +781,55 @@ git remote set-url origin \
 
 Do not commit or echo the token value; the credential is injected at run time.
 
+### Running the live Agent Server
+
+Docker needs `sudo` here: the daemon does not auto-start and the socket is
+root-owned. The managed LLM proxy works end to end; the key is short-lived, so
+refresh it before each run:
+
+```bash
+KEY=$(curl -s -H "X-Session-API-Key: $SESSION_API_KEY" \
+  "$OH_LLM_API_KEY_REFRESH_URL")
+sudo docker run -d --name cortex-agent-server -p 127.0.0.1:8000:8000 \
+  -e SESSION_API_KEY="local-dev-session-key-0123456789" \
+  -e LLM_API_KEY="$KEY" \
+  -e LLM_MODEL="openai/deepseek-v4-flash" \
+  -e LLM_BASE_URL="https://llm-proxy.app.all-hands.dev" \
+  -v /tmp/oh-workspaces:/workspace \
+  ghcr.io/openhands/agent-server:1.56.0-python
+```
+
+The container runs as uid 10001, so anything under the mounted directory must be
+owned by that uid (`sudo chown -R 10001:10001 /tmp/oh-workspaces`). Run the live
+swarm test as that same user, because it shells out to `git` in the worktrees:
+
+```bash
+sudo -u '#10001' env \
+  CORTEX_LIVE_AGENT_SERVER_URL=http://127.0.0.1:8000 \
+  CORTEX_LIVE_SESSION_API_KEY=local-dev-session-key-0123456789 \
+  CORTEX_LIVE_LLM_API_KEY="$KEY" HOME=/tmp \
+  bash -c 'cd /workspace/ruflo/v3 && npx vitest run \
+    __tests__/integration/cortex-live-swarm.test.ts'
+```
+
+### Agent Server contract traps (verified against 1.56.0)
+
+Read `GET /openapi.json` from the running server before trusting any assumed
+payload shape. Four traps cost real debugging time:
+
+- `workspace.working_dir` must be absolute. A relative path resolves against the
+  server's working directory (`/`), not the mounted workspace, and fails with
+  `PermissionError`.
+- `agent_settings` takes a plain `llm` block. Setting `agent_settings.agent` to an
+  object is rejected: for `agent_kind: "openhands"` it must be a string.
+- The `llm` block goes to LiteLLM, so `model` needs a provider prefix
+  (`openai/deepseek-v4-flash`) and the fields are snake_case (`api_key`,
+  `base_url`). A missing prefix fails with "LLM Provider NOT provided"; a missing
+  key fails with an `AuthenticationError` that looks like a server fault.
+- The conversation auto-starts during create unless the initial message sets
+  `run: false`, so a follow-up `POST .../run` returns `409`. Treat 409 as
+  already-running, never as a submission failure.
+
 ### Honesty rules
 
 The registry and the docs enforce these, and reviewers will check them:
@@ -789,5 +838,7 @@ The registry and the docs enforce these, and reviewers will check them:
 - A descriptor's `source` must be an `https://` URL.
 - One SDK per capability; a second registration is an error, not an override.
 - Report capability counts, never a single completion percentage.
-- Say what has not been tested. Live Agent Server execution, a production
-  verifier, merge coordination, and the Cloud IDE front end are all still open.
+- Say what has not been tested. Live multi-agent isolation is now proven (three
+  concurrent tasks, three branches, no cross-contamination). Still open: the merge
+  coordinator, production secret management, and live runs of the other nine
+  roles.

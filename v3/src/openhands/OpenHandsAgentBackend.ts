@@ -196,12 +196,21 @@ export class OpenHandsAgentBackend {
         body: '{}',
       }, signal);
     } catch (error) {
-      // Do not delete or blindly retry a created conversation: the server may
-      // have accepted it despite a lost response. Surface the ID for recovery.
-      throw new OpenHandsBackendError(
-        `Conversation ${conversation.id} was created but could not be started: ${error instanceof Error ? error.message : 'unknown error'}`,
-        error instanceof OpenHandsBackendError ? error.statusCode : undefined,
-      );
+      // A 409 here is not a failure. The server auto-starts a conversation when
+      // the initial message does not set `run: false`, so by the time we call
+      // /run the conversation is already executing and the server refuses the
+      // duplicate start. Treating that as fatal reported a running task as
+      // failed. Verified against Agent Server 1.56.0: create returns
+      // execution_status "running" and /run returns 409 in that case.
+      const alreadyRunning = error instanceof OpenHandsBackendError && error.statusCode === 409;
+      if (!alreadyRunning) {
+        // Do not delete or blindly retry a created conversation: the server may
+        // have accepted it despite a lost response. Surface the ID for recovery.
+        throw new OpenHandsBackendError(
+          `Conversation ${conversation.id} was created but could not be started: ${error instanceof Error ? error.message : 'unknown error'}`,
+          error instanceof OpenHandsBackendError ? error.statusCode : undefined,
+        );
+      }
     }
 
     return {

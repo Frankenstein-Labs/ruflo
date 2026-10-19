@@ -56,7 +56,67 @@ After tasks are independently verified, a coordinator must check dependency orde
 
 ## Current verification status
 
-The swarm implementation and focused tests have been added to the branch. They have not been executed in this session. This is not yet an end-to-end working service: a real workspace provisioner, real diff/test verifier, server profile selection, merge coordinator, and live Agent Server validation remain integration gates.
+Verified against a real Agent Server on 2026-10-19, not inferred from source.
+
+What was actually run:
+
+- Image `ghcr.io/openhands/agent-server:1.56.0-python` started as a container
+  with `SESSION_API_KEY` and an LLM key from the managed proxy.
+- `GET /health` returned `{"status":"ok"}`.
+- Three tasks (alpha, beta, gamma) were submitted concurrently through the real
+  TypeScript stack (`CortexSwarmBridge` -> `OpenHandsSwarm` ->
+  `OpenHandsAgentBackend`) and each one finished with an independent verifier
+  returning passed: true.
+- Each task ran in its own Git worktree on its own branch
+  (`cortex/alpha`, `cortex/beta`, `cortex/gamma`). Each agent wrote its marker
+  file only in its own worktree; no marker appeared in another task's worktree.
+
+The runnable proof is `v3/__tests__/integration/cortex-live-swarm.test.ts`. It is
+skipped unless `CORTEX_LIVE_AGENT_SERVER_URL` is set, so it never runs in CI
+without a server. To run it:
+
+```bash
+CORTEX_LIVE_AGENT_SERVER_URL=http://127.0.0.1:8000 \
+CORTEX_LIVE_SESSION_API_KEY=<session key> \
+CORTEX_LIVE_LLM_API_KEY=<llm key> \
+CORTEX_LIVE_MOUNT_HOST_ROOT=/tmp/oh-workspaces \
+CORTEX_LIVE_SANDBOX_ROOT=/workspace \
+npx vitest run __tests__/integration/cortex-live-swarm.test.ts
+```
+
+### Contract facts confirmed against Agent Server 1.56.0
+
+These were observed from the live server and its OpenAPI document, and two of
+them contradicted earlier assumptions in this repository:
+
+- `POST /api/conversations` requires `workspace.working_dir` to be an absolute
+  path. A relative path is resolved against the server's working directory (`/`),
+  which is not the mounted workspace, and fails with `PermissionError`.
+- The `agent_settings` object accepts a plain `llm` block
+  (`{"llm": {"model", "api_key", "base_url"}}`). Passing
+  `agent_settings.agent` as an object is rejected: for `agent_kind: "openhands"`
+  the server expects a string agent class.
+- The `llm` block is forwarded to LiteLLM, so `model` needs a provider prefix
+  (`openai/deepseek-v4-flash`, not `deepseek-v4-flash`), and the key field is
+  snake_case `api_key` / `base_url`.
+- The server starts a conversation during create unless the initial message sets
+  `run: false`. A following `POST /api/conversations/{id}/run` therefore returns
+  `409 Conversation already running`. `OpenHandsAgentBackend` previously treated
+  that 409 as a fatal submission error and reported a running task as failed;
+  it now treats 409 as already-running. See the regression tests in
+  `__tests__/integration/openhands-backend.test.ts`.
+- Conversation events are read with `GET /api/conversations/{id}/events`; a bare
+  `?limit=` query is rejected with 422.
+
+### What is still not done
+
+This is a working multi-agent execution path, not a finished service. Still open:
+
+- the merge coordinator that integrates verified branches (section 3 above);
+- production secret management for the LLM key (the key is passed per request in
+  this local setup);
+- the run above used three tasks of one role; the ten roles exist as
+  configuration, and only the `testing` role has been exercised live.
 
 ## References
 

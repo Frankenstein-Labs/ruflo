@@ -143,8 +143,9 @@ export class OpenHandsAgentBackend {
       throw new OpenHandsBackendError('Agent specification must include kind and llm.model.');
     }
     if (!config.allowedWorkspaceRoot || !config.allowedWorkspaceRoot.startsWith('/') ||
-      config.allowedWorkspaceRoot.split('/').includes('..')) {
-      throw new OpenHandsBackendError('allowedWorkspaceRoot must be configured as an absolute POSIX path.');
+      config.allowedWorkspaceRoot.split('/').includes('..') ||
+      normalizePosixPath(config.allowedWorkspaceRoot) === '/') {
+      throw new OpenHandsBackendError('allowedWorkspaceRoot must be a specific absolute POSIX directory, not the filesystem root.');
     }
     if (config.maxIterations !== undefined &&
       (!Number.isInteger(config.maxIterations) || config.maxIterations < 1 || config.maxIterations > 500)) {

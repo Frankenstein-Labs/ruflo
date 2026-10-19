@@ -17,6 +17,7 @@ The submodule points to https://github.com/OpenHands/software-agent-sdk. It cont
 Use Docker Compose v2 from this directory. Set the model provider credentials in the shell or a local `.env` file that is never committed:
 
 ```bash
+export CORTEX_OPENHANDS_API_KEY='generate-a-long-random-session-key'
 export LLM_API_KEY='your-provider-key'
 export LLM_MODEL='your-provider/model-name'
 docker compose up -d
@@ -31,9 +32,9 @@ Configure the existing `OpenHandsAgentBackend` with:
 - `CORTEX_OPENHANDS_ENABLED=true`
 - `CORTEX_OPENHANDS_BASE_URL=http://localhost:8000` for local development only
 - `CORTEX_OPENHANDS_ALLOWED_WORKSPACE_ROOT=/workspace`
-- `CORTEX_OPENHANDS_API_KEY` only when using an authenticated remote gateway
+- `CORTEX_OPENHANDS_API_KEY` must match `SESSION_API_KEY` in Compose; for remote deployment, use the same header through an authenticated HTTPS gateway
 
-Every task's `workingDirectory` must be a real path inside `/workspace` as seen by the Agent Server. The current swarm interface intentionally requires an injected workspace provisioner and verifier. Until those production implementations are supplied and tested, the swarm must not claim that a task has passed or merge its branch.
+Every task's `workingDirectory` must be a real path inside `/workspace` as seen by the Agent Server. The current swarm interface has concrete Git worktree provisioning and result-verification implementations. Configure the verifier with repository-specific test commands and run them in an isolated environment before treating any task as accepted; this PR has not yet been built or exercised against a live server.
 
 ## 4. Safety and verification
 

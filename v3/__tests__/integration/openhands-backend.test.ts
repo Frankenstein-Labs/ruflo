@@ -127,6 +127,27 @@ describe('OpenHandsAgentBackend', () => {
     expect(String(error)).not.toContain('SECRET_PROVIDER_DETAIL');
   });
 
+  it('returns a terminal conversation state without claiming acceptance success', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      response({ id: 'conversation-123', execution_status: 'finished' }),
+    );
+    const backend = new OpenHandsAgentBackend({
+      baseUrl: 'http://localhost:8000',
+      enabled: true,
+      agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
+      allowedWorkspaceRoot: '/workspace',
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    const result = await backend.waitForCompletion('conversation-123', {
+      pollIntervalMs: 250,
+      maxWaitMs: 1000,
+    });
+
+    expect(result.execution_status).toBe('finished');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('maps environment configuration without enabling the backend implicitly', () => {
     const config = openHandsConfigFromEnv({ kind: 'CodeActAgent', llm: { model: 'test-model' } }, {
       CORTEX_OPENHANDS_BASE_URL: 'http://localhost:8000',

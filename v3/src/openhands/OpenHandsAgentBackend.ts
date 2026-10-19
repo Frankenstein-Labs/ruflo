@@ -164,16 +164,21 @@ export class OpenHandsAgentBackend {
         task.acceptanceCriteria.map((item, index) => `${index + 1}. ${item}`).join('\n')
       : '\n\nCORTEX must independently define and run verification before reporting success.';
 
+    const { kind: agentClass, llm, ...agentOptions } = this.config.agent;
     const payload = {
-      agent: this.config.agent,
+      agent_settings: {
+        agent_kind: 'openhands',
+        agent: agentClass,
+        ...agentOptions,
+        llm,
+      },
       initial_message: {
         role: 'user',
         content: [{ type: 'text', text: `CORTEX task ${task.taskId}:\n${task.instruction}${criteria}` }],
       },
       max_iterations: task.maxIterations ?? this.config.maxIterations ?? 50,
       stuck_detection: true,
-      workspace: { type: 'local', working_dir: task.workingDirectory },
-      user_id: 'cortex-agent-os',
+      workspace: { working_dir: task.workingDirectory },
     };
 
     const conversation = await this.request<OpenHandsConversation>('/api/conversations', {
@@ -273,7 +278,7 @@ export class OpenHandsAgentBackend {
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (init.body !== undefined) headers['Content-Type'] = 'application/json';
-      if (this.config.apiKey) headers.Authorization = `Bearer ${this.config.apiKey}`;
+      if (this.config.apiKey) headers['X-Session-API-Key'] = this.config.apiKey;
       const response = await this.fetchImpl(new URL(path, this.baseUrl), {
         ...init,
         headers: { ...headers, ...(init.headers as Record<string, string> | undefined) },

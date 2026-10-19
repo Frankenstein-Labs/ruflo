@@ -74,8 +74,8 @@ describe('OpenHandsGitWorktreeProvisioner', () => {
     const runGit = vi.fn(async (args: string[]) => {
       calls.push(args);
       if (args[0] === 'worktree' && args[1] === 'add') {
-        await mkdir(args[3], { recursive: true });
-        await writeFile(path.join(args[3], '.git'), 'gitdir: mock');
+        await mkdir(args[4], { recursive: true });
+        await writeFile(path.join(args[4], '.git'), 'gitdir: mock');
       }
       return { stdout: args[0] === 'branch' ? '' : 'ok', stderr: '' };
     });

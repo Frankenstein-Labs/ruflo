@@ -52,6 +52,7 @@ describe('OpenHandsAgentBackend', () => {
 
     const backend = new OpenHandsAgentBackend({
       baseUrl: 'http://localhost:8000',
+      apiKey: 'test-session-key',
       enabled: true,
       agent: { kind: 'CodeActAgent', llm: { model: 'test-model' } },
       allowedWorkspaceRoot: '/workspace',
@@ -69,6 +70,7 @@ describe('OpenHandsAgentBackend', () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(String(fetchImpl.mock.calls[0][0])).toBe('http://localhost:8000/api/conversations');
+    expect((fetchImpl.mock.calls[0][1]?.headers as Record<string, string>)['X-Session-API-Key']).toBe('test-session-key');
     expect(String(fetchImpl.mock.calls[1][0])).toBe('http://localhost:8000/api/conversations/conversation-123/run');
     const payload = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body));
     expect(payload.workspace).toEqual({ working_dir: '/workspace/project' });

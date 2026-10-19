@@ -217,8 +217,8 @@ export class OpenHandsAgentBackend {
 }
 
 export function openHandsConfigFromEnv(
-  env: Record<string, string | undefined> = process.env,
   agent: Record<string, unknown>,
+  env: Record<string, string | undefined> = process.env,
 ): OpenHandsBackendConfig {
   const timeout = Number(env.CORTEX_OPENHANDS_REQUEST_TIMEOUT_MS ?? 60_000);
   return {

@@ -30,3 +30,14 @@ export { MCPServer } from './infrastructure/mcp/MCPServer';
 export { AgentTools } from './infrastructure/mcp/tools/AgentTools';
 export { MemoryTools } from './infrastructure/mcp/tools/MemoryTools';
 export { ConfigTools } from './infrastructure/mcp/tools/ConfigTools';
+
+// CORTEX coding-agent execution backend
+export {
+  OpenHandsAgentBackend,
+  OpenHandsBackendError,
+  openHandsConfigFromEnv,
+  type OpenHandsBackendConfig,
+  type OpenHandsConversation,
+  type OpenHandsTask,
+  type OpenHandsTaskHandle,
+} from './openhands/OpenHandsAgentBackend';

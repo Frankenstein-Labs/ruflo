@@ -266,6 +266,7 @@ export function openHandsConfigFromEnv(
     apiKey: env.CORTEX_OPENHANDS_API_KEY,
     timeoutMs: timeout,
     enabled: env.CORTEX_OPENHANDS_ENABLED === 'true',
+    allowedWorkspaceRoot: env.CORTEX_OPENHANDS_ALLOWED_WORKSPACE_ROOT ?? '',
     agent,
   };
 }

@@ -60,6 +60,21 @@ export class OpenHandsGitResultVerifier implements OpenHandsResultVerifier {
     };
 
     await run('git-diff-check', 'git', ['diff', '--check']);
+    try {
+      const status = await this.runCommand('git', ['status', '--porcelain', '--untracked-files=all'], input.task.workingDirectory, this.timeoutMs);
+      const hasChanges = status.stdout.trim().length > 0;
+      checks.push({
+        name: 'git-worktree-has-changes',
+        passed: hasChanges,
+        details: hasChanges ? undefined : 'No tracked or untracked changes were produced.',
+      });
+    } catch (error) {
+      checks.push({
+        name: 'git-worktree-has-changes',
+        passed: false,
+        details: error instanceof Error ? error.message.slice(0, 300) : 'Could not inspect Git worktree status.',
+      });
+    }
     for (const check of this.options.checks) await run(check.name, check.command, check.args);
 
     const passed = checks.length > 0 && checks.every((check) => check.passed);

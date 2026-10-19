@@ -12,6 +12,8 @@ export interface OpenHandsBackendConfig {
   enabled?: boolean;
   /** Agent specification accepted by the configured OpenHands Agent Server. */
   agent: Record<string, unknown>;
+  /** Absolute workspace root visible to Agent Server; tasks cannot escape it. */
+  allowedWorkspaceRoot: string;
   maxIterations?: number;
   fetchImpl?: typeof fetch;
 }
@@ -72,17 +74,44 @@ function safeBaseUrl(value: string): URL {
   return new URL(url.toString().replace(/\/$/, ''));
 }
 
-function validateTask(task: OpenHandsTask): void {
+function normalizePosixPath(value: string): string {
+  const parts: string[] = [];
+  for (const part of value.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length === 0) throw new OpenHandsBackendError('Workspace path escapes the filesystem root.');
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+  return '/' + parts.join('/');
+}
+
+function validateTask(task: OpenHandsTask, allowedWorkspaceRoot: string): void {
   if (!task.taskId.trim()) throw new OpenHandsBackendError('taskId is required.');
   if (!task.instruction.trim()) throw new OpenHandsBackendError('instruction is required.');
+  if (task.instruction.length > 30_000) throw new OpenHandsBackendError('instruction exceeds the 30000 character limit.');
   if (!task.workingDirectory.startsWith('/')) {
     throw new OpenHandsBackendError('workingDirectory must be an absolute POSIX path visible to Agent Server.');
   }
-  if (task.workingDirectory.split('/').includes('..')) {
-    throw new OpenHandsBackendError('workingDirectory must not contain path traversal segments.');
+  if (!allowedWorkspaceRoot.startsWith('/') || allowedWorkspaceRoot.split('/').includes('..')) {
+    throw new OpenHandsBackendError('allowedWorkspaceRoot must be an absolute POSIX path without traversal segments.');
   }
-  if ((task.acceptanceCriteria ?? []).some((criterion) => !criterion.trim())) {
-    throw new OpenHandsBackendError('acceptanceCriteria must not contain empty values.');
+  const workspace = normalizePosixPath(task.workingDirectory);
+  const root = normalizePosixPath(allowedWorkspaceRoot);
+  if (workspace !== root && !workspace.startsWith(root.endsWith('/') ? root : root + '/')) {
+    throw new OpenHandsBackendError('workingDirectory is outside the configured allowedWorkspaceRoot.');
+  }
+  if ((task.acceptanceCriteria ?? []).length > 30) {
+    throw new OpenHandsBackendError('At most 30 acceptance criteria are allowed.');
+  }
+  if ((task.acceptanceCriteria ?? []).some((criterion) => !criterion.trim() || criterion.length > 2_000)) {
+    throw new OpenHandsBackendError('Acceptance criteria must be non-empty and no longer than 2000 characters each.');
+  }
+  const iterations = task.maxIterations;
+  if (iterations !== undefined && (!Number.isInteger(iterations) || iterations < 1 || iterations > 500)) {
+    throw new OpenHandsBackendError('maxIterations must be an integer between 1 and 500.');
   }
 }
 
@@ -108,6 +137,13 @@ export class OpenHandsAgentBackend {
     if (!config.agent || typeof config.agent !== 'object' || Array.isArray(config.agent)) {
       throw new OpenHandsBackendError('A valid OpenHands agent specification is required.');
     }
+    if (!config.allowedWorkspaceRoot || !config.allowedWorkspaceRoot.startsWith('/')) {
+      throw new OpenHandsBackendError('allowedWorkspaceRoot must be configured as an absolute POSIX path.');
+    }
+    if (config.maxIterations !== undefined &&
+      (!Number.isInteger(config.maxIterations) || config.maxIterations < 1 || config.maxIterations > 500)) {
+      throw new OpenHandsBackendError('maxIterations must be an integer between 1 and 500.');
+    }
     if (!isLocalHost(this.baseUrl.hostname) && !config.apiKey) {
       throw new OpenHandsBackendError('CORTEX_OPENHANDS_API_KEY is required for non-local Agent Server URLs.');
     }
@@ -115,7 +151,7 @@ export class OpenHandsAgentBackend {
   }
 
   async submit(task: OpenHandsTask, signal?: AbortSignal): Promise<OpenHandsTaskHandle> {
-    validateTask(task);
+    validateTask(task, this.config.allowedWorkspaceRoot);
     const criteria = task.acceptanceCriteria?.length
       ? '\n\nAcceptance criteria (CORTEX must verify these independently):\n' +
         task.acceptanceCriteria.map((item, index) => `${index + 1}. ${item}`).join('\n')

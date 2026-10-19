@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - 'v3/src/openhands/**'
+      - 'v3/src/cortex/**'
       - 'v3/__tests__/integration/openhands-*.test.ts'
+      - 'v3/__tests__/cortex/**'
+      - 'docs/CORTEX_*.md'
       - 'infra/openhands/**'
       - '.gitmodules'
       - '.github/workflows/cortex-openhands-integration.yml'
@@ -43,3 +46,44 @@ jobs:
           __tests__/integration/openhands-backend.test.ts
           __tests__/integration/openhands-swarm.test.ts
           __tests__/integration/openhands-git-worktree.test.ts
+
+  cortex-runtime-tests:
+    name: CORTEX runtime, adapters and swarm bridge tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Ruflo
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+      - name: Install V3 dependencies
+        working-directory: v3
+        run: pnpm install --frozen-lockfile
+      # The swarm bridge tests create real Git worktrees, so the runner needs
+      # a Git identity of its own.
+      - name: Configure Git identity for worktree tests
+        run: |
+          git config --global user.email "cortex-ci@example.com"
+          git config --global user.name "CORTEX CI"
+      - name: Run CORTEX runtime tests
+        working-directory: v3
+        run: >-
+          pnpm exec vitest run
+          __tests__/cortex/
+      - name: Typecheck CORTEX sources
+        working-directory: v3
+        run: >-
+          pnpm exec tsc --noEmit
+          --strict
+          --target es2022
+          --module esnext
+          --moduleResolution bundler
+          --skipLibCheck
+          --esModuleInterop
+          src/cortex/index.ts

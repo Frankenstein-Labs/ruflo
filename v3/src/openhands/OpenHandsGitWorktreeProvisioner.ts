@@ -55,7 +55,7 @@ export class OpenHandsGitWorktreeProvisioner implements OpenHandsWorkspaceProvis
     this.hostWorkspaceRoot = absoluteWithoutTraversal(options.hostWorkspaceRoot, 'hostWorkspaceRoot');
     this.serverWorkspaceRoot = absoluteWithoutTraversal(options.serverWorkspaceRoot, 'serverWorkspaceRoot');
     this.baseRef = options.baseRef ?? 'HEAD';
-    if (!this.baseRef.trim() || this.baseRef.startsWith('-') || /[\\r\\n]/.test(this.baseRef)) {
+    if (!this.baseRef.trim() || this.baseRef.startsWith('-') || /[\r\n]/.test(this.baseRef)) {
       throw new Error('baseRef must be a non-empty Git ref and must not start with a dash.');
     }
     this.runGit = options.runGit ?? (async (args) => {

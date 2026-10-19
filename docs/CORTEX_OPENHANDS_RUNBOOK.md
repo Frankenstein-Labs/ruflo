@@ -16,7 +16,7 @@
 1. Deploy the official OpenHands Agent Server in a trusted environment. For the current upstream instructions, see the [Agent Server README](https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-agent-server/openhands/agent_server/README.md).
 2. Use a dedicated disposable workspace or container per task. The `workingDirectory` path must be visible to the Agent Server; a path on the Ruflo host is not automatically mounted into a remote server.
 3. Configure the Agent Server with a supported agent specification/profile and provider credentials through its server-side secret/configuration mechanism. Do not place model-provider keys in this repository, task prompts, logs, or browser clients.
-4. Configure authentication on the Agent Server. Remote CORTEX connections require HTTPS and `CORTEX_OPENHANDS_API_KEY`.
+4. Configure authentication on the Agent Server. Remote CORTEX connections require HTTPS and `CORTEX_OPENHANDS_API_KEY`. Configure `CORTEX_OPENHANDS_ALLOWED_WORKSPACE_ROOT` to the workspace root mounted inside the Agent Server; the adapter refuses task paths outside that root.
 
 ## Environment
 
@@ -25,6 +25,7 @@ CORTEX_OPENHANDS_ENABLED=true
 CORTEX_OPENHANDS_BASE_URL=https://your-agent-server.example
 CORTEX_OPENHANDS_API_KEY=<secret-from-your-secret-manager>
 CORTEX_OPENHANDS_REQUEST_TIMEOUT_MS=60000
+CORTEX_OPENHANDS_ALLOWED_WORKSPACE_ROOT=/workspace
 ```
 
 Keep these values in the deployment secret manager or an untracked local `.env`. Never commit real credentials. Local development may use `http://localhost:8000`; plain HTTP is rejected for non-local hosts.
@@ -45,6 +46,7 @@ const agent = {
 
 const backend = new OpenHandsAgentBackend(openHandsConfigFromEnv(agent));
 
+// The environment must also set CORTEX_OPENHANDS_ALLOWED_WORKSPACE_ROOT=/workspace.
 const handle = await backend.submit({
   taskId: 'mission-001-task-001',
   instruction: 'Implement the requested change in the authorized repository.',

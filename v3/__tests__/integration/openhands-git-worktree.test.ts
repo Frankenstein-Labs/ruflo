@@ -98,6 +98,7 @@ describe('OpenHandsGitWorktreeProvisioner', () => {
       expect(workspace).toEqual({
         branchName: 'cortex/agent-1',
         workingDirectory: '/workspace/agent-1/worktree',
+        hostWorkingDirectory: path.join(hostWorkspaceRoot, 'agent-1', 'worktree'),
       });
       expect(calls).toContainEqual(['worktree', 'add', '-b', 'cortex/agent-1', path.join(hostWorkspaceRoot, 'agent-1', 'worktree'), 'main']);
     } finally {

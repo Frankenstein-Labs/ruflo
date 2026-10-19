@@ -71,7 +71,12 @@ describe('OpenHandsAgentBackend', () => {
     expect(String(fetchImpl.mock.calls[0][0])).toBe('http://localhost:8000/api/conversations');
     expect(String(fetchImpl.mock.calls[1][0])).toBe('http://localhost:8000/api/conversations/conversation-123/run');
     const payload = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body));
-    expect(payload.workspace).toEqual({ type: 'local', working_dir: '/workspace/project' });
+    expect(payload.workspace).toEqual({ working_dir: '/workspace/project' });
+    expect(payload.agent_settings).toEqual({
+      agent_kind: 'openhands',
+      agent: 'CodeActAgent',
+      llm: { model: 'test-model' },
+    });
     expect(payload.initial_message.content[0].text).toContain('README.md contains a project summary');
   });
 

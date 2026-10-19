@@ -25,6 +25,7 @@ describe('OpenHandsAgentBackend', () => {
       baseUrl: 'http://localhost:8000',
       enabled: false,
       agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
     })).toThrow(/disabled/i);
   });
 
@@ -33,12 +34,14 @@ describe('OpenHandsAgentBackend', () => {
       baseUrl: 'http://agent.example.com',
       enabled: true,
       agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
     })).toThrow(/HTTPS/i);
 
     expect(() => new OpenHandsAgentBackend({
       baseUrl: 'https://agent.example.com',
       enabled: true,
       agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
     })).toThrow(/API_KEY/i);
   });
 
@@ -51,6 +54,7 @@ describe('OpenHandsAgentBackend', () => {
       baseUrl: 'http://localhost:8000',
       enabled: true,
       agent: { llm: { model: 'test-model' } },
+      allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
@@ -77,6 +81,7 @@ describe('OpenHandsAgentBackend', () => {
       baseUrl: 'http://localhost:8000',
       enabled: true,
       agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
@@ -93,6 +98,7 @@ describe('OpenHandsAgentBackend', () => {
       baseUrl: 'http://localhost:8000',
       enabled: true,
       agent: { llm: {} },
+      allowedWorkspaceRoot: '/workspace',
       fetchImpl: fetchImpl as typeof fetch,
     });
 
@@ -112,5 +118,6 @@ describe('OpenHandsAgentBackend', () => {
     });
     expect(config.enabled).toBe(false);
     expect(config.agent).toEqual({ llm: { model: 'test-model' } });
+    expect(config.allowedWorkspaceRoot).toBe('');
   });
 });
